@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Server</title>
+    <link rel="icon" href="/static/img/favicon.ico">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/index.css" rel="stylesheet">
+    <script src="/static/js/jquery.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+
+<style type="text/css">
+  #touxiang{
+    width:200px;
+    height:200px;
+    line-height:200px;
+    text-align:center;
+    font-size:80px;
+    border:1px solid #ccc;
+    margin:0 auto;
+    position: relative;
+  }
+  #touxiang:after{
+    content:"+";
+    color:#ccc;
+  }
+  #drag{
+    width:500px;
+    height:350px;
+    border:1px dashed #ccc;
+    margin:0px auto;
+  }
+  #touxiang img{
+    width:200px;
+    height:200px;
+    position: absolute;
+    top:0;
+    left:0;
+    z-index:1;
+  }
+</style>
+
+</head>
+<body>
+<div class="navbar navbar-default">
+    <div class="container">
+        <div class="navbar-header">
+            <div class="navbar-brand">
+                Upload Server
+            </div>
+        </div>
+        <ul class="nav navbar-nav">
+           <li><a href="/file/index">首页</a></li>
+<!--            {% if xxoo == -1 %}
+            <li><a href="">文件</a></li>
+            {%endif%}-->
+        </ul>
+
+        <ul class="nav navbar-nav navbar-right">
+            <!-- <li><a class="nav navbar-nav navbar-right" data-toggle="modal" data-target="#myModal">上传文件</a></li> -->
+<!--            <li><a href="">退出</a></li>-->
+        </ul>
+    </div>
+</div>
+
+<div id= "progressBarZone"></div>
+
+<div class="container">
+    <p class="text-center" class="bg-success">请使用谷歌浏览器，切换文件夹后，拖动上传~~~~</p>
+
+    <form  method="post" action="/file/index">
+        <div>
+        <label for="dirs">添加目录</label>
+        <input class="form-control"  name="dirs"></input>
+        </div>
+    <input type="submit"  value="确定" class="btn btn-success">
+    </form>
+
+    <h4>当前路径: 
+        <a href="/file/index">/</a>
+        <a href="/file/{{ .Addpath }}">{{ .Addpath }}</a>
+    </h4>
+    <table class="table table-striped table-hover">
+        <thead>
+        <td>#</td>
+        <td>名称</td>
+        <td>修改时间</td>
+        <td>类型</td>
+        <td>大小</td>
+        </thead>
+        <tbody>
+        {{ range $index,$dir := .Dirs }}
+        <tr>
+            <td>{{$index}}</td>
+            <td><a href="/file/{{ $.Addpath }}{{ $dir.Name}}/">{{ $dir.Name }}</a></td>
+            <td>{{ $dir.GetTime }}</td>
+            <td>{{ $dir.Type }}</td>
+            {{if eq $dir.Size 0}}
+            <td> - </td>
+            {{end}}
+        </tr>
+        {{ end }}
+        {{ range $index,$file := .Files }}
+        <tr>
+            <td>{{$index}}</td>
+            <td><a href="/download/{{ $.Addpath }}{{ $file.Name}}">{{ $file.Name }}</a></td>
+            <td>{{ $file.GetTime }}</td>
+            <td>{{ $file.Type }}</td>
+            <td>{{ $file.GetSize }}</td>
+        </tr>
+        {{ end }}
+
+        </tbody>
+    </table>
+</div>
+
+
+<script>
+var progressBarZone = document.getElementById('progressBarZone');
+ 
+function sendFile(files) {
+  if (!files || files.length < 1) {
+    return;
+  }
+  
+  var percent = document.createElement('div' );
+  progressBarZone.appendChild(percent);
+
+  //var upload_path = location.pathname.split('/').pop();
+  var upload_path = {{ $.Addpath }}
+  var formData = new FormData();             // 创建一个表单对象FormData
+  formData.append( 'submit', '中文' );  // 往表单对象添加文本字段
+  formData.append('upload_path', upload_path); 
+  
+  var fileNames = '' ;
+
+  for ( var i = 0; i < files.length; i++) {
+    var file = files[i];    // file 对象有 name, size 属性
+    formData.append( 'myFile', file);       // 往FormData对象添加File对象
+    fileNames += '《' + file.name + '》， ' ;
+  }
+  console.log(formData,fileNames);
+      
+  var xhr = new XMLHttpRequest();
+  xhr.upload.addEventListener( 'progress',
+   function uploadProgress(evt) {
+     // evt 有三个属性：
+     // lengthComputable – 可计算的已上传字节数
+     // total – 总的字节数
+     // loaded – 到目前为止上传的字节数
+     if (evt.lengthComputable) {
+          percent.innerHTML = fileNames + ' upload percent :' + Math.round((evt.loaded / evt.total)  * 100) + '%';
+    }
+  }, false); // false表示在事件冒泡阶段处理
+
+  xhr.upload.onload = function() {
+    percent.innerHTML = fileNames + '上传完成。' ;
+  };
+
+  xhr.upload.onerror = function(e) {
+    percent.innerHTML = fileNames + ' 上传失败。' ;
+  };
+
+  xhr.open( 'post', '/upload' , true);
+  xhr.send(formData);            // 发送表单对象。
+  xhr.onreadystatechange=function(){
+    if(xhr.readyState===xhr.DONE){
+        console.log("done");
+        window.location.reload();
+    }
+  }
+}
+ 
+document.addEventListener("dragover", function(e) {
+  e.stopPropagation();
+  e.preventDefault();            // 必须调用。否则浏览器会进行默认处理，比如文本类型的文件直接打开，非文本的可能弹出一个下载文件框。
+}, false);
+ 
+document.addEventListener("drop", function(e) {
+  e.stopPropagation();
+  e.preventDefault();            // 必须调用。否则浏览器会进行默认处理，比如文本类型的文件直接打开，非文本的可能弹出一个下载文件框。
+  sendFile(e.dataTransfer.files);
+}, false);
+
+</script>
+
+</body>
+</html>
